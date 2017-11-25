@@ -7,13 +7,12 @@ Created on Sun Nov 12 20:29:45 2017
 """
 import pandas as pd
 import plotly.plotly as py
-import urllib
 import ast
 import HTMLParser
 import string
 import json
-import pygeoj
 import geopandas as gpd
+import urllib2
 
 seleCol =  range(40,45)
 seleCol.append(1)
@@ -40,6 +39,10 @@ laws = laws[['code','state', 'total score','curved score','grade',
              '2010 gun death rate','2009 gun export rates']]
 
 
+#read crime rate
+
+crime = pd.read_csv('crime_data_w_population_and_crime_rate.csv', 
+                   usecols=[0, 1, 2, 21, 22, 23])
 
 #containing 2015 unemployment rate and household income
 eco = pd.read_csv('Unemployment.csv',usecols=[0, 1, 2, 41, 46])
@@ -54,10 +57,19 @@ allData = pd.merge(allData, edu, left_on='FIPStxt', right_on='FIPS Code')
 
 
 url = 'http://catalog.civicdashboards.com/dataset/ff54801b-6683-4566-b267-d873b7fa6369/resource/c6540266-7bea-4c88-8deb-0ec6870c50b9/download/5766c073476c40b1aa888aa245423989temp.geojson'
-new_york_data = json.load('new_york.geojson')
-new_york_data = ast.literal_eval(new_york_data)
 
-new_york_data = gpd.read_file('new_york.geojson')
+
+req = urllib2.Request(url)
+req.add_header('User-Agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.8.1.14) Gecko/20080404 Firefox/2.0.0.14')
+page = urllib2.urlopen(req);response=page.read();page.close()
+cookie=page.info()['Set-Cookie']
+# top is for obtaining the cookie via the info get.
+req = urllib2.Request(url)#send the new url with the cookie.
+req.add_header('User-Agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.8.1.14) Gecko/20080404 Firefox/2.0.0.14')
+req.add_header('Cookie',cookie)
+page = urllib2.urlopen(req)
+response=page.read();page.close()
+new_york_data = ast.literal_eval(response)
 
 
 county_names = []
@@ -70,6 +82,36 @@ for county in new_york_data['features']:
             county_names_dict[county['properties']['name'][0:m-1]] = county['properties']['name']
             
 print county_names
+
+
+
+
+url = 'https://bubinga.co/wp-content/uploads/jsoncounties.min_.js'
+
+req = urllib2.Request(url)
+req.add_header('User-Agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.8.1.14) Gecko/20080404 Firefox/2.0.0.14')
+page = urllib2.urlopen(req);response=page.read();page.close()
+
+# top is for obtaining the cookie via the info get.
+req = urllib2.Request(url)#send the new url with the cookie.
+req.add_header('User-Agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.8.1.14) Gecko/20080404 Firefox/2.0.0.14')
+req.add_header('Cookie',cookie)
+page = urllib2.urlopen(req)
+response=page.read();page.close()
+new_york_data = ast.literal_eval(response)
+
+
+county_names = []
+county_names_dict = {}
+
+for county in new_york_data['features']:
+    for m in range(len(county['properties']['name'])):
+        if county['properties']['name'][m:m+6] == 'County':
+            county_names.append(county['properties']['name'][0:m-1])
+            county_names_dict[county['properties']['name'][0:m-1]] = county['properties']['name']
+            
+print county_names
+
 
 
 
