@@ -5,6 +5,7 @@ Created on Sun Nov 12 20:29:45 2017
 
 @author: Xin
 """
+#%%
 import pandas as pd
 import plotly.plotly as py
 import ast
@@ -19,7 +20,7 @@ seleCol.append(1)
 
 laws = pd.read_csv('laws.csv', delimiter=' ', header=None, usecols=seleCol)
 
-laws.columns = ['state', 'total score','curved score','grade','2010 gun death rate','2009 gun export rates']
+laws.columns = ['state', 'total_score','curved_score','grade','2010_gun_death_rate','2009_gun_export_rates']
 
 laws.set_index('state', inplace = True)
 
@@ -35,27 +36,74 @@ df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/2011_
 
 laws['code']=df['code']
 
-laws = laws[['code','state', 'total score','curved score','grade',
-             '2010 gun death rate','2009 gun export rates']]
+laws = laws[['code','state', 'total_score','curved_score','grade',
+             '2010_gun_death_rate','2009_gun_export_rates']]
 
 
 #read crime rate
-
 crime = pd.read_csv('crime_data_w_population_and_crime_rate.csv', 
                    usecols=[0, 1, 2, 21, 22, 23])
+#create FIPS code by combining FIPSstate and FIPScity
+crime['FIPStxt'] = pd.to_numeric(crime.FIPS_ST.apply(str)+
+     crime.FIPS_CTY.apply(str).str.zfill(3))
 
 #containing 2015 unemployment rate and household income
 eco = pd.read_csv('Unemployment.csv',usecols=[0, 1, 2, 41, 46])
+eco['Median_Household_Income_2015'] = eco['Median_Household_Income_2015'].str.replace(',','')
+eco['Median_Household_Income_2015'] = pd.to_numeric(eco['Median_Household_Income_2015'])
+
 #containing 2015 Estimated percent of people of all ages
 poverty = pd.read_csv('PovertyEstimates.csv',usecols=[0, 11])
+poverty.rename(index=str, columns={'CI90LBALLP_2015':'poverty_rate'}, inplace=True)
+#missing value
+poverty.fillna(0)
+poverty['poverty_rate'] = pd.to_numeric(poverty['poverty_rate'])
+#set missing value by median
+poverty.ix[561,['poverty_rate']]= poverty['poverty_rate'].median()
+
 #Sources: Census Bureau,2011-2015 American Community Survey 5-yr average.
 edu = pd.read_csv('Education.csv',usecols=[0, 45])
+edu.rename(index=str, columns={'Percent of adults completing some college or associate\'s degree, 2011-2015':'college_rate'}, inplace=True)
 
 
+#cdc firearm death 1999-2015
+fire = pd.read_csv('Underlying Cause of Death, 1999-2015.txt', 
+                    delimiter='\t') 
+fire['Deaths'] = pd.to_numeric(fire['Deaths'], errors='coerce')
+fire['Population'] = pd.to_numeric(fire['Population'])
+fire['fire_rate'] = 100000.0*fire['Deaths']/fire['Population']
+#fill nan with 0
+fire['fire_rate'] = fire['fire_rate'].fillna(value=0.0)
+#round
+fire['fire_rate'] = fire['fire_rate'].round(2)
+
+
+#merge to one dataframe
 allData = pd.merge(eco, poverty, on='FIPStxt')
 allData = pd.merge(allData, edu, left_on='FIPStxt', right_on='FIPS Code')
+#allData = pd.merge(allData, crime, on='FIPStxt')
+allData = pd.merge(allData, fire, left_on='FIPStxt', right_on='County Code')
+allData = pd.merge(allData, laws, left_on='State', right_on='code')
+#allData FIPStxt code padding (add zero)
+allData['FIPStxt'] = allData.FIPStxt.apply(str).str.zfill(5)
+             
+#%%
 
+def norm(data_frame):
+    return (data_frame-data_frame.min())/(data_frame.max()-data_frame.min())
+#min-max normalize data
+allData['curved_score']  = norm(allData['curved_score'])
+allData['Unemployment_rate_2015']=norm(allData['Unemployment_rate_2015'])
+allData['Median_Household_Income_2015']=norm(allData['Median_Household_Income_2015'])
+allData['poverty_rate']=norm(allData['poverty_rate'])
+#allData['crime_rate_per_100000']=norm(allData['crime_rate_per_100000'])
+allData['college_rate']=norm(allData['college_rate'])
+allData['fire_rate']=norm(allData['fire_rate'])
 
+#write to file
+allData.to_csv('allData.csv')
+
+#%%
 url = 'http://catalog.civicdashboards.com/dataset/ff54801b-6683-4566-b267-d873b7fa6369/resource/c6540266-7bea-4c88-8deb-0ec6870c50b9/download/5766c073476c40b1aa888aa245423989temp.geojson'
 
 
